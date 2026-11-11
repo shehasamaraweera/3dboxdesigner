@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>3D Box Designer</title>
+<style>
+:root{--bg:#f4f1ea;--fg:#1d1d1b;--card:#fff;--muted:#6b6b66;--accent:#b9702f;--f1:rgba(214,160,100,.92);--f2:rgba(194,140,82,.92);--f3:rgba(232,190,140,.92);--edge:#6e4318;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#18171a;--fg:#eee;--card:#242327;--muted:#a09fa6;--accent:#e0924a;--f1:rgba(190,130,70,.9);--f2:rgba(160,105,55,.9);--f3:rgba(210,155,100,.9);--edge:#f0c590}}
+:root[data-theme="dark"]{--bg:#18171a;--fg:#eee;--card:#242327;--muted:#a09fa6;--accent:#e0924a;--f1:rgba(190,130,70,.9);--f2:rgba(160,105,55,.9);--f3:rgba(210,155,100,.9);--edge:#f0c590}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;display:flex;flex-direction:column;align-items:center;min-height:100vh}
+h1{font-size:1.3rem;margin:20px 16px 4px;text-align:center}
+p.sub{margin:0 16px;color:var(--muted);font-size:.9rem;text-align:center}
+.stage{width:100%;max-width:520px;height:380px;perspective:900px;display:flex;align-items:center;justify-content:center;touch-action:none;cursor:grab;user-select:none;overflow:hidden}
+.stage:active{cursor:grabbing}
+.scene{--w:200px;--d:200px;--h:100px;width:0;height:0;position:relative;transform-style:preserve-3d;transform:rotateX(-25deg) rotateY(-35deg)}
+.scene *{transform-style:preserve-3d}
+.f{position:absolute;border:2px solid var(--edge);box-sizing:border-box;backface-visibility:visible;color:var(--edge);font-weight:600;font-size:13px;display:flex;align-items:center;justify-content:center;overflow:hidden;white-space:nowrap}
+.fb,.bk{width:var(--w);height:var(--h);left:calc(var(--w)/-2);top:calc(var(--h)/-2);background:var(--f1)}
+.front{transform:translateZ(calc(var(--d)/2))}
+.back{transform:rotateY(180deg) translateZ(calc(var(--d)/2))}
+.sd{width:var(--d);height:var(--h);left:calc(var(--d)/-2);top:calc(var(--h)/-2);background:var(--f2)}
+.right{transform:rotateY(90deg) translateZ(calc(var(--w)/2))}
+.left{transform:rotateY(-90deg) translateZ(calc(var(--w)/2))}
+.bottom{width:var(--w);height:var(--d);left:calc(var(--w)/-2);top:calc(var(--d)/-2);background:var(--f3);transform:translateY(calc(var(--h)/2)) rotateX(90deg)}
+.hinge{position:absolute;transform:translate3d(0,calc(var(--h)/-2),calc(var(--d)/-2));transition:transform .8s ease}
+.lid{position:absolute;width:var(--w);height:var(--d);left:calc(var(--w)/-2);top:0;transform-origin:50% 0;transform:rotateX(90deg);background:var(--f3);border:2px solid var(--edge);box-sizing:border-box;display:flex;align-items:center;justify-content:center;color:var(--edge);font-weight:600;font-size:13px;overflow:hidden;white-space:nowrap}
+.open .hinge{transform:translate3d(0,calc(var(--h)/-2),calc(var(--d)/-2)) rotateX(115deg)}
+.btns{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin:6px 16px}
+button{background:var(--accent);color:#fff;border:0;border-radius:10px;padding:10px 16px;font-size:.95rem;cursor:pointer}
+button.alt{background:var(--card);color:var(--fg);border:1px solid var(--muted)}
+.card{background:var(--card);border-radius:14px;padding:14px 18px;margin:16px;max-width:420px;width:calc(100% - 32px);box-sizing:border-box;font-size:.95rem;line-height:1.6}
+.card b{color:var(--accent)}
+#arUI{position:fixed;inset:0;visibility:hidden;pointer-events:none;color:#fff}
+#arInfo{position:absolute;left:12px;right:12px;top:calc(env(safe-area-inset-top,0px) + 16px);background:rgba(0,0,0,.65);padding:10px 14px;border-radius:10px;text-align:center;font-size:.95rem}
+#arExit{position:absolute;right:16px;bottom:24px;pointer-events:auto}
+button:disabled{opacity:.5;cursor:not-allowed}
+.inputs{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px}
+.inputs label{display:flex;flex-direction:column;font-size:.8rem;color:var(--muted);gap:4px}
+.inputs input{font-size:1rem;padding:8px;border-radius:8px;border:1px solid var(--muted);background:var(--bg);color:var(--fg);width:100%;box-sizing:border-box}
+</style>
+</head>
+<body>
+<h1>3D Box Designer</h1>
+<p class="sub">Change the size and the box updates • Drag to rotate</p>
+<div class="stage" id="stage">
+  <div class="scene" id="scene">
+    <div class="f fb front" data-l="lh"></div>
+    <div class="f bk back" data-l="lh"></div>
+    <div class="f sd right" data-l="wh"></div>
+    <div class="f sd left" data-l="wh"></div>
+    <div class="f bottom" data-l="lw"></div>
+    <div class="hinge"><div class="lid" data-l="lw"></div></div>
+  </div>
+</div>
+<div class="card">
+  <div class="inputs">
+    <label>Length (cm)<input id="L" type="number" inputmode="decimal" min="1" max="100" step="0.5" value="10"></label>
+    <label>Width (cm)<input id="W" type="number" inputmode="decimal" min="1" max="100" step="0.5" value="10"></label>
+    <label>Height (cm)<input id="H" type="number" inputmode="decimal" min="1" max="100" step="0.5" value="5"></label>
+  </div>
+  <div>Volume: <b id="vol"></b></div>
+  <div>Surface area: <b id="area"></b></div>
+</div>
+<div class="btns">
+  <button id="lidBtn">Open lid</button>
+  <button class="alt" id="spinBtn">Auto-rotate: on</button>
+  <button class="alt" id="resetBtn">Reset size and view</button>
+  <button id="arBtn">View in AR (real size)</button>
+</div>
+<p class="sub" id="arMsg" style="margin-bottom:16px"></p>
+<div id="arUI"><div id="arInfo"></div><button id="arExit">Exit AR</button></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+var rx=-25,ry=-35,spin=true,down=false,lx=0,ly=0;
+var scene=document.getElementById('scene'),stage=document.getElementById('stage');
+var iL=document.getElementById('L'),iW=document.getElementById('W'),iH=document.getElementById('H');
+function num(el,def){var v=parseFloat(el.value);if(!(v>0))return def;return Math.min(v,100)}
+function fmt(n){return (Math.round(n*100)/100).toString()}
+function update(){
+  var L=num(iL,10),W=num(iW,10),H=num(iH,5);
+  var k=220/Math.max(L,W,H);
+  scene.style.setProperty('--w',L*k+'px');
+  scene.style.setProperty('--d',W*k+'px');
+  scene.style.setProperty('--h',H*k+'px');
+  var t={lh:fmt(L)+' × '+fmt(H),wh:fmt(W)+' × '+fmt(H),lw:fmt(L)+' × '+fmt(W)};
+  var els=scene.querySelectorAll('[data-l]');
+  for(var i=0;i<els.length;i++){els[i].textContent=t[els[i].getAttribute('data-l')]}
+  document.getElementById('vol').textContent=fmt(L*W*H)+' cm³';
+  document.getElementById('area').textContent=fmt(2*(L*W+L*H+W*H))+' cm²';
+}
+function draw(){scene.style.transform='rotateX('+rx+'deg) rotateY('+ry+'deg)'}
+[iL,iW,iH].forEach(function(e){e.addEventListener('input',update)});
+stage.addEventListener('pointerdown',function(e){down=true;lx=e.clientX;ly=e.clientY;stage.setPointerCapture(e.pointerId)});
+stage.addEventListener('pointermove',function(e){if(!down)return;ry+=(e.clientX-lx)*0.6;rx-=(e.clientY-ly)*0.6;lx=e.clientX;ly=e.clientY;draw()});
+stage.addEventListener('pointerup',function(){down=false});
+stage.addEventListener('pointercancel',function(){down=false});
+(function tick(){if(spin&&!down){ry+=0.3;draw()}requestAnimationFrame(tick)})();
+document.getElementById('lidBtn').onclick=function(){var o=scene.classList.toggle('open');this.textContent=o?'Close lid':'Open lid'};
+document.getElementById('spinBtn').onclick=function(){spin=!spin;this.textContent='Auto-rotate: '+(spin?'on':'off')};
+document.getElementById('resetBtn').onclick=function(){rx=-25;ry=-35;iL.value=10;iW.value=10;iH.value=5;update();draw()};
+update();
+(function(){
+var btn=document.getElementById('arBtn'),msg=document.getElementById('arMsg'),ui=document.getElementById('arUI'),info=document.getElementById('arInfo'),exitBtn=document.getElementById('arExit');
+if(!navigator.xr||!window.THREE){btn.disabled=true;msg.textContent='AR is not available here. Open this link in Chrome on an Android phone (ARCore).';return}
+navigator.xr.isSessionSupported('immersive-ar').then(function(ok){msg.textContent=ok?'AR ready: the box will be shown at the real size you typed above.':'This device or browser does not support WebXR AR. Use Chrome on an ARCore Android phone.';if(!ok)btn.disabled=true}).catch(function(){});
+var renderer,scene3,camera,reticle,boxGroup,session=null,hitSource=null,locked=false,hasHit=false,dims='';
+function build(){
+ var L=num(iL,10),W=num(iW,10),H=num(iH,5);
+ dims=fmt(L)+' × '+fmt(W)+' × '+fmt(H)+' cm';
+ if(boxGroup)scene3.remove(boxGroup);
+ boxGroup=new THREE.Group();
+ var geo=new THREE.BoxGeometry(L/100,H/100,W/100);
+ boxGroup.add(new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color:0xd29b5a,transparent:true,opacity:0.85})));
+ boxGroup.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo),new THREE.LineBasicMaterial({color:0x6e4318})));
+ boxGroup.userData.H=H/100;
+ boxGroup.visible=false;
+ scene3.add(boxGroup);
+}
+function render(t,frame){
+ if(frame&&hitSource){
+  var ref=renderer.xr.getReferenceSpace();
+  var hits=frame.getHitTestResults(hitSource);
+  if(hits.length){
+   var pose=hits[0].getPose(ref);
+   if(pose&&!locked){
+    reticle.visible=true;
+    reticle.matrix.fromArray(pose.transform.matrix);
+    boxGroup.position.setFromMatrixPosition(reticle.matrix);
+    boxGroup.position.y+=boxGroup.userData.H/2;
+    boxGroup.visible=true;hasHit=true;
+   }
+  }else if(!locked){reticle.visible=false}
+ }
+ renderer.render(scene3,camera);
+}
+function onSelect(){
+ if(!hasHit)return;
+ locked=!locked;
+ reticle.visible=!locked;
+ info.textContent=locked?'Placed at real size ('+dims+'). Tap again to move it.':'Aim at the floor, then tap to place the box.';
+}
+function onEnd(){
+ renderer.setAnimationLoop(null);
+ if(hitSource)hitSource.cancel();
+ hitSource=null;session=null;hasHit=false;locked=false;
+ ui.style.visibility='hidden';
+}
+btn.onclick=function(){
+ if(!renderer){
+  renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.xr.enabled=true;
+  renderer.domElement.style.cssText='position:fixed;left:0;top:0;width:1px;height:1px;opacity:0;pointer-events:none';
+  document.body.appendChild(renderer.domElement);
+  scene3=new THREE.Scene();
+  camera=new THREE.PerspectiveCamera(70,1,0.01,20);
+  scene3.add(new THREE.HemisphereLight(0xffffff,0x888888,1));
+  var dl=new THREE.DirectionalLight(0xffffff,0.6);dl.position.set(1,3,2);scene3.add(dl);
+  reticle=new THREE.Mesh(new THREE.RingGeometry(0.12,0.15,32).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({color:0xffffff}));
+  reticle.matrixAutoUpdate=false;reticle.visible=false;scene3.add(reticle);
+ }
+ build();locked=false;hasHit=false;
+ navigator.xr.requestSession('immersive-ar',{requiredFeatures:['hit-test'],optionalFeatures:['dom-overlay'],domOverlay:{root:ui}}).then(function(s){
+  session=s;
+  renderer.xr.setReferenceSpaceType('local');
+  renderer.xr.setSession(s);
+  info.textContent='Move your phone slowly to scan the floor, then tap to place the '+dims+' box.';
+  ui.style.visibility='visible';
+  s.addEventListener('end',onEnd);
+  s.addEventListener('select',onSelect);
+  s.requestReferenceSpace('viewer').then(function(vs){return s.requestHitTestSource({space:vs})}).then(function(src){hitSource=src});
+  renderer.setAnimationLoop(render);
+ }).catch(function(e){msg.textContent='Could not start AR: '+e.message+'. Try opening this link in Chrome on Android.'});
+};
+exitBtn.addEventListener('beforexrselect',function(e){e.preventDefault()});
+exitBtn.onclick=function(){if(session)session.end()};
+})();
+</script>
+</body>
+</html>
